@@ -1,4 +1,4 @@
-function [outname] = clean_dscalars_by_size(dscalarwithassignments,manualset,groupnetworksfile,dostripes,mincol,minsize,orig_parcelsfile,make_consensus,assign_unassigned,remove46)
+function [outname] = clean_dscalars_by_size(dscalarwithassignments,manualset,groupnetworksfile,dostripes,mincol,minsize,orig_parcelsfile,make_consensus,assign_unassigned,remove46, resources_dir)
 %consensus_maker_knowncolors(regularized_ciftifile,[manualset],[groupnetworksfile],[dostripes],[mincol],[minsize],[orig_parcelsfile])
 
 %This function cleans up networks.
@@ -42,7 +42,7 @@ this_code = which('clean_dscalars_by_size');
 support_folder=[code_dir '/support_files']; %find support files in the code directory.
 %support_folder=[pwd '/support_files'];
 addpath(genpath(support_folder));
-settings=settings_comparematrices;%
+settings=settings_comparematrices(resources_dir);%
 np=size(settings.path,2);
 
 if isdeployed
@@ -347,7 +347,7 @@ for i=1:length(dscalarwithassignments)
                             int_clusterassings = bordererassigns > 0;
                             mode_neighborval = mode(bordererassigns(int_clusterassings));
                             if mode_neighborval ==0
-                                disp(clusternum)
+                                disp(clusternum);
                             end
                         else
                             if overlap ==0 % allow networks to get an assingment of 0, but only for overlapping networks.
@@ -419,10 +419,10 @@ for i=1:length(dscalarwithassignments)
     ft_write_cifti_mod(outname,cifti_data);
     if overlap ==0
         
-        set_cifti_powercolors([outname '.dscalar.nii'])
+        set_cifti_powercolors([outname '.dscalar.nii']);
         
     else
-        set_cifti_powercolors([outname '.dtseries.nii'])
+        set_cifti_powercolors([outname '.dtseries.nii']);
         
     end
     if exist('orig_parcelsfile') && ~isempty(orig_parcelsfile)
@@ -436,11 +436,11 @@ for i=1:length(dscalarwithassignments)
             outtext(IDnum) = mode(out(parcels==IDs(IDnum)));
             outtext_bycol(IDnum,:) = mean(all_recolored(parcels==IDs(IDnum),:),1);
         end
-        dlmwrite([outname '.txt'],outtext,'delimiter',' ')
-        dlmwrite([basename '_allcolumns_recolored.txt'],outtext_bycol,'delimiter',' ')
+        dlmwrite([outname '.txt'],outtext,'delimiter',' ');
+        dlmwrite([basename '_allcolumns_recolored.txt'],outtext_bycol,'delimiter',' ');
     end
 end
-disp('Done running clean dscalars code.')
+disp('Done running clean dscalars code.');
 
 %Stripes
 

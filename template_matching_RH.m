@@ -1,4 +1,4 @@
-function [new_subject_labels, output_cifti_scalar_name] = template_matching_RH(dconn_filename, data_type, template_path,transform_data,output_cifti_name, cifti_output_folder, wb_command, make_cifti_from_results,allow_overlap,overlap_method,surface_only,already_surface_only)
+function [new_subject_labels, output_cifti_scalar_name] = template_matching_RH(dconn_filename, data_type, template_path,transform_data,output_cifti_name, cifti_output_folder, wb_command, make_cifti_from_results,allow_overlap,overlap_method,surface_only,already_surface_only,resources_dir)
 
 %subjectlist = subject (e.g. dconn.nii)
 %data_type = "parcellated" or "dense" connectivity matrix
@@ -17,7 +17,7 @@ function [new_subject_labels, output_cifti_scalar_name] = template_matching_RH(d
 %load /data/cn6/allyd/kelleyData/allSubjects.mat %%% allSubjects
 %load /data/cn6/allyd/kelleyData/subjectswith20min.mat %%% subs_25min
 
-
+disp(resources_dir);
 %allow_overlap = 1;
 %overlap_method = 'smooth_then_derivative';
 %thresholds = [1:0.25:3.5];
@@ -27,7 +27,7 @@ this_code = which('template_matching_RH');
 [code_dir,~] = fileparts(this_code);
 support_folder=[code_dir '/support_files']; %find support files in the code directory.
 addpath(genpath(support_folder));
-settings=settings_comparematrices;%
+settings=settings_comparematrices(resources_dir);%
 np=size(settings.path,2);
 
 amIdeployed = isdeployed(); 
@@ -48,6 +48,9 @@ else
     addpath(genpath('/home/faird/shared/code/internal/utilities/Zscore_dconn'));
     warning('on')
 end
+
+assert(exist('Zscore_dconn') ~= 0, "Couldn't find Zscore_dconn.");
+% TODO Figure out how to verify that save exists
 
 if exist('wb_command','var') ==1
     %do nothing
@@ -143,7 +146,7 @@ for sub = 1:length(dconn_filename)
         if exist([cifti_output_folder '/' output_cifti_name '.mat']) == 2
             disp('.mat file already reated.  loading...');
             load([cifti_output_folder '/' output_cifti_name '.mat']);
-            new_subject_labels = eta_subject_index;
+%            new_subject_labels = eta_subject_index;
         else
  
             %%% if template-matching using correlation %%%
@@ -285,7 +288,7 @@ for sub = 1:length(dconn_filename)
             
             toc
             disp(['Saving .mat file: ' cifti_output_folder '/' output_cifti_name '.mat'])
-             save([cifti_output_folder '/' output_cifti_name '.mat'],'eta_to_template_vox','new_subject_labels','network_names','-v7.3')
+            save([cifti_output_folder '/' output_cifti_name '.mat'],'eta_to_template_vox','new_subject_labels','network_names','-v7.3');
 %             new_subject_labels = eta_subject_index;
             
             switch transform_data
@@ -294,53 +297,44 @@ for sub = 1:length(dconn_filename)
                 otherwise
             end
             
-            
+        end
             % if make_cifi_from_results == 1; %DF: This variable was not defined, I changed to make a cifti if the mat file exists.
             
-            %if exist([cifti_output_folder '/' output_cifti_name '.mat'],'file') == 2
+        if exist([cifti_output_folder '/' output_cifti_name '.mat'],'file') == 2
             disp('saving file to cifti')
             if surface_only ==1
-                saving_template =ciftiopen(settings.path{12}, wb_command); % don't forget to load in a gifti object, or  else saving_template will be interpreted as a struct.
+                saving_template =ciftiopen(settings.path_greyord_dscalar_surface_only, wb_command); % don't forget to load in a gifti object, or  else saving_template will be interpreted as a struct.
             else %assume 91282
-                saving_template =ciftiopen(settings.path{8}, wb_command); % don't forget to load in a gifti object, or  else saving_template will be interpreted as a struct.
+                saving_template =ciftiopen(settings.path_greyord_dscalar, wb_command); % don't forget to load in a gifti object, or  else saving_template will be interpreted as a struct.
             end
-            
+
             saving_template.cdata = single(new_subject_labels);
-            
-            %addpath('/mnt/max/shared/code/internal/utilities/corr_pt_dt/support_files');
-            disp('Saving new scalar')
-            save(saving_template, [cifti_output_folder '/' output_cifti_name '.gii'],'ExternalFileBinary')
-            %save(saving_template, output_cifti_scalar_name, wb_command)
             switch data_type
                 case 'parcellated'
                     output_cifti_scalar_name  = [cifti_output_folder '/' output_cifti_name '.pscalar.nii' ];
                 case 'dense'
                     output_cifti_scalar_name  = [cifti_output_folder '/' output_cifti_name '.dscalar.nii' ];
             end
-            disp('Converting scalar .gii to .nii')
-            unix([wb_command ' -cifti-convert -from-gifti-ext ' cifti_output_folder '/' output_cifti_name '.gii ' output_cifti_scalar_name ]);
-            disp('Removing .gii')
-            unix(['rm -f ' cifti_output_folder '/' output_cifti_name '.gii']);
-            unix(['rm -f ' cifti_output_folder '/' output_cifti_name '.dat']);
-            
+            ciftisave(saving_template, output_cifti_scalar_name, wb_command);
+
             if exist('allow_overlap','var') == 1 && allow_overlap == 1
                 %open example dtseries.nii
-                
+
                 disp('Saving overlap files as dtseries')
                 if surface_only ==1
                     cii =ciftiopen(settings.path{11}, wb_command);
                 else %assume 91282
-                    
+
                     cii =ciftiopen(settings.path{10}, wb_command);
                 end
-                
+
                 switch overlap_method
                     case'hist_localmin'
                         for j=1:length(network_names)
                             if j==4 || j ==6
                                 continue
                             end
-                            
+
                             %etaZ(:,j) = zscore(eta_to_template_vox(:,j));
                             etaZabovethreshold = eta_to_template_vox(:,j) > MuI_threshhold_all_networks(j);
                             overlapeta(:,j) = etaZabovethreshold*j;
@@ -348,13 +342,13 @@ for sub = 1:length(dconn_filename)
                         series = overlapeta;
                         cii.cdata = uint8(series);
                         ciftisave(cii,[cifti_output_folder '/' output_cifti_name '_overlap_' overlap_method '.dtseries.nii'],wb_command);
-                        
+
                     case 'smooth_then_derivative'
                         for j=1:length(network_names)
                             if j==4 || j ==6
                                 continue
                             end
-                            
+
                             %etaZ(:,j) = zscore(eta_to_template_vox(:,j));
                             etaZabovethreshold = eta_to_template_vox(:,j) > MuI_threshhold_all_networks(j);
                             overlapeta(:,j) = etaZabovethreshold*j;
@@ -362,7 +356,7 @@ for sub = 1:length(dconn_filename)
                         series = overlapeta;
                         cii.cdata = uint8(series);
                         ciftisave(cii,[cifti_output_folder '/' output_cifti_name '_overlap_' overlap_method '.dtseries.nii'],wb_command);
-                        
+
                     case 'etaZ'
                         for k =1:size(thresholds,2)
                             series = squeeze(overlapetaZ(:,:,k));
@@ -375,19 +369,15 @@ for sub = 1:length(dconn_filename)
                 % make sure that"assign_unassinged is set to zero" for
                 % overlapping networks. Otherwise the whole brain will be assinged to every network.
                 clean_dscalars_by_size([cifti_output_folder '/' output_cifti_name '_overlap_' overlap_method '.dtseries.nii'],[],[],[],[],30,[],0,0,0);
-            else
-            end
-            
         end
-        % else
-        %     disp(['Something went wrong.' cifti_output_folder '/' output_cifti_name '.mat not found.  Data was not made into a cifti.' ]);
-        % end
-    end
+        else
+            disp(['Something went wrong.' cifti_output_folder '/' output_cifti_name '.mat not found.  Data was not made into a cifti.' ]);
+        end
 end
 
 disp(['Cleaning: ' output_cifti_scalar_name]);
-[outname] = clean_dscalars_by_size(output_cifti_scalar_name,[],[],[],[],30,[],0,1,1); %do not change the make concensus to 1 here. It will ruin your network assingments.
-disp(['Clean file: ' outname '.dscalar.nii'])
+[outname] = clean_dscalars_by_size(output_cifti_scalar_name,[],[],[],[],30,[],0,1,1, resources_dir); %do not change the make concensus to 1 here. It will ruin your network assingments.
+disp(['Clean file: ' outname '.dscalar.nii']);
 
 % cmd = ['mv ' cifti_output_folder '/' output_cifti_scalar_name];
 % unix(cmd)
