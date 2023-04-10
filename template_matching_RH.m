@@ -102,6 +102,8 @@ switch transform_data
         TEMPLATEMINIMUM = 0.37;
     case 'Convert_to_Zscores'
         TEMPLATEMINIMUM = 1.00;
+    case 'Already_Zscores'
+        TEMPLATEMINIMUM = 1.00;
     otherwise
         TEMPLATEMINIMUM = 0.37;
 end
